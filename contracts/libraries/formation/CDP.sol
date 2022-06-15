@@ -17,29 +17,79 @@ library CDP {
     using SafeERC20 for IDetailedERC20;
     using SafeMath for uint256;
 
+    struct Level {
+        uint256 interest;
+        uint256 lowerBound;
+        uint256 upperBound;
+        uint256 updateTime;
+    }
     struct Context {
         FixedPointMath.uq192x64 collateralizationLimit;
         FixedPointMath.uq192x64 accumulatedYieldWeight;
+		uint period;
+		uint periodThreshold;
+		Level[] levels;
     }
-
     struct Data {
         uint256 totalDeposited;
         uint256 totalDebt;
-        uint256 totalCredit;
-        uint256 lastDeposit;
+        uint256 totalCredit; // accumulated interest
+        uint256 lastDeposit; // TODO: remove
+		uint256 depositTime;
+		uint256 lastUpdateTime;
         FixedPointMath.uq192x64 lastAccumulatedYieldWeight;
     }
+    function toDays(uint period, uint time) internal view returns(uint256){
+        return time / period;
+    }
+	function canHarvest(Data storage _self, Context storage _ctx) internal view returns(bool){
+		if(toDays(_ctx.period, block.timestamp) - toDays(_ctx.period, _self.depositTime) == _ctx.periodThreshold){
+			return true;
+		}
+		return false;
+	}
+	function _updateInterest(Data storage _self, Context storage _ctx) internal view returns(uint256) {
+        uint interest = 0;
+        uint previousLevelPtr;
+        uint updateTime = _self.lastUpdateTime;
+        uint periods;
+        bool inRange = false;
+        for(uint256 i = 0;i < _ctx.levels.length;i++){
+            // find all levels fitting the deposit amount
+            if(_self.totalDeposited < _ctx.levels[i].lowerBound || _ctx.levels[i].upperBound <= _self.totalDeposited){
+                continue;
+            }
+            inRange = true;
+            // try to update the interest
+            if(_ctx.levels[i].updateTime <= updateTime){
+                previousLevelPtr = i;
+                continue;
+            }else{
+                periods = toDays(_ctx.period, _ctx.levels[i].updateTime) - toDays(_ctx.period, updateTime);
+                updateTime = _ctx.levels[i].updateTime;
+                interest += periods * _ctx.levels[previousLevelPtr].interest;
+                previousLevelPtr = i;
+            }
+        }
+        require(inRange, "not in any levels");
+        periods = toDays(_ctx.period, block.timestamp) - toDays(_ctx.period, updateTime);
+        interest += periods * _ctx.levels[previousLevelPtr].interest;
+        return interest;
+	}
 
     function update(Data storage _self, Context storage _ctx) internal {
-        uint256 _earnedYield = _self.totalCredit.add(_self.getEarnedYield(_ctx));
-        if (_earnedYield > _self.totalDebt) {
-            uint256 _currentTotalDebt = _self.totalDebt;
-            _self.totalDebt = 0;
-            _self.totalCredit = _earnedYield.sub(_currentTotalDebt);
-        } else {
-            _self.totalDebt = _self.totalDebt.sub(_earnedYield);
-        }
-        _self.lastAccumulatedYieldWeight = _ctx.accumulatedYieldWeight;
+		uint _interest = _self._updateInterest(_ctx);
+		_self.lastUpdateTime = block.timestamp;
+		_self.totalCredit = _self.totalCredit.add(_interest);
+        // uint256 _earnedYield = _self.totalCredit.add(_self.getEarnedYield(_ctx));
+        // if (_earnedYield > _self.totalDebt) {
+        //     uint256 _currentTotalDebt = _self.totalDebt;
+        //     _self.totalDebt = 0;
+        //     _self.totalCredit = _earnedYield.sub(_currentTotalDebt);
+        // } else {
+        //     _self.totalDebt = _self.totalDebt.sub(_earnedYield);
+        // }
+        // _self.lastAccumulatedYieldWeight = _ctx.accumulatedYieldWeight;
     }
 
     /// @dev Assures that the CDP is healthy.

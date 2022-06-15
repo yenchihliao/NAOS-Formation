@@ -87,6 +87,10 @@ contract FormationV2 is ReentrancyGuard {
     /// @dev The token that this contract is using as the child asset.
     IMintableERC20 public xtoken;
 
+	/// @dev The token pool in charge of distributing token to staking accounts
+	// yen added
+	address public pool;
+
     /// @dev The address of the account which currently has administrative capabilities over this contract.
     address public governance;
 
@@ -331,35 +335,52 @@ contract FormationV2 is ReentrancyGuard {
 
     /// @dev Harvests yield from a vault.
     ///
-    /// @param _vaultId the identifier of the vault to harvest from.
+    /// @param _amount the amount of interest to be reclaimed by the caller
     ///
     /// @return the amount of funds that were harvested from the vault.
 
-    function harvest(uint256 _vaultId) external expectInitialized returns (uint256, uint256) {
-        VaultV2.Data storage _vault = _vaults.get(_vaultId);
+    // function harvest(uint256 _vaultId) external expectInitialized returns (uint256, uint256) {
+    function harvest(uint256 _amount) external expectInitialized returns (uint256) {
 
-        (uint256 _harvestedAmount, uint256 _decreasedValue) = _vault.harvest(address(this));
-
-        if (_harvestedAmount > 0) {
-            uint256 _feeAmount = _harvestedAmount.mul(harvestFee).div(PERCENT_RESOLUTION);
-            uint256 _distributeAmount = _harvestedAmount.sub(_feeAmount);
-            FixedPointMath.uq192x64 memory _weight = FixedPointMath.fromU256(_distributeAmount).div(totalDeposited);
-            _ctx.accumulatedYieldWeight = _ctx.accumulatedYieldWeight.add(_weight);
-
-            if (_feeAmount > 0) {
-                token.safeTransfer(rewards, _feeAmount);
-            }
-
-            if (_distributeAmount > 0) {
-                _distributeToTransmuter(_distributeAmount);
-            }
-        }
-
-        emit FundsHarvested(_harvestedAmount, _decreasedValue);
-
-        return (_harvestedAmount, _decreasedValue);
+		// TODO: check if 30 days is reached
+		require(_amount > 0, "amounto is zero");
+		CDP.Data storage _cdp = _cdps[msg.sender];
+		require(_cdp.canHarvest(_ctx), "staking time too short to harvest");
+		_cdp.update(_ctx);
+		if(_cdp.totalCredit <= _amount){
+			_amount = _cdp.totalCredit;
+			_cdp.totalCredit = 0;
+		}else{
+			_cdp.totalCredit.sub(_amount);
+		}
+		token.transferFrom(pool, msg.sender, _amount);
+		emit FundsHarvested(_amount, _amount);
+		return _amount;
+        // VaultV2.Data storage _vault = _vaults.get(_vaultId);
+        //
+        // (uint256 _harvestedAmount, uint256 _decreasedValue) = _vault.harvest(address(this));
+        //
+        // if (_harvestedAmount > 0) {
+        //     uint256 _feeAmount = _harvestedAmount.mul(harvestFee).div(PERCENT_RESOLUTION);
+        //     uint256 _distributeAmount = _harvestedAmount.sub(_feeAmount);
+        //     FixedPointMath.uq192x64 memory _weight = FixedPointMath.fromU256(_distributeAmount).div(totalDeposited);
+        //     _ctx.accumulatedYieldWeight = _ctx.accumulatedYieldWeight.add(_weight);
+        //
+        //     if (_feeAmount > 0) {
+        //         token.safeTransfer(rewards, _feeAmount);
+        //     }
+        //
+        //     if (_distributeAmount > 0) {
+        //         _distributeToTransmuter(_distributeAmount);
+        //     }
+        // }
+        //
+        // emit FundsHarvested(_harvestedAmount, _decreasedValue);
+        //
+        // return (_harvestedAmount, _decreasedValue);
     }
 
+	// TODO: remove
     /// @dev Recalls an amount of deposited funds from a vault to this contract.
     ///
     /// @param _vaultId the identifier of the recall funds from.
@@ -369,6 +390,7 @@ contract FormationV2 is ReentrancyGuard {
         return _recallFunds(_vaultId, _amount);
     }
 
+	// TODO: need no flush
     /// @dev Flushes buffered tokens to the active vault.
     ///
     /// This function reverts if an emergency exit is active. This is in place to prevent the potential loss of
@@ -379,6 +401,7 @@ contract FormationV2 is ReentrancyGuard {
         return flushActiveVault();
     }
 
+	// TODO: need no flush
     /// @dev Internal function to flush buffered tokens to the active vault.
     ///
     /// This function reverts if an emergency exit is active. This is in place to prevent the potential loss of
@@ -405,22 +428,28 @@ contract FormationV2 is ReentrancyGuard {
     ///
     /// @param _amount the amount of collateral to deposit.
     function deposit(uint256 _amount) external nonReentrant noContractAllowed expectInitialized {
+		//TODO: check if the amount is not acceptible for the level
         require(_amount > 0, "amount is zero");
-        uint256 amount_USDT = _amount.mul(USDT_CONST);
+        // uint256 amount_USDT = _amount.mul(USDT_CONST);
 
         require(!emergencyExit, "emergency pause enabled");
 
         CDP.Data storage _cdp = _cdps[msg.sender];
         _cdp.update(_ctx);
+		if(_cdp.totalDeposited == 0){
+			_cdp.depositTime = block.timestamp;
+		}
 
         token.safeTransferFrom(msg.sender, address(this), _amount);
-        if (amount_USDT >= flushActivator) {
+        // if (amount_USDT >= flushActivator) {
+		// TODO: need no flush
+        if (_amount >= flushActivator) {
             flushActiveVault();
         }
-        totalDeposited = totalDeposited.add(_amount);
+        // totalDeposited = totalDeposited.add(_amount);
 
-        _cdp.totalDeposited = _cdp.totalDeposited.add(amount_USDT);
-        _cdp.lastDeposit = block.number;
+        // _cdp.totalDeposited = _cdp.totalDeposited.add(amount_USDT);
+        _cdp.totalDeposited = _cdp.totalDeposited.add(_amount);
 
         emit TokensDeposited(msg.sender, _amount);
     }
@@ -429,25 +458,31 @@ contract FormationV2 is ReentrancyGuard {
     ///
     /// This function reverts if a deposit into the CDP was made in the same block. This is to prevent flash loan attacks
     /// on other internal or external systems.
-    ///
-    /// @param _amount the amount of collateral to withdraw.
-    function withdraw(uint256 _amount) external nonReentrant noContractAllowed expectInitialized returns (uint256, uint256) {
-        require(_amount > 0, "amount is zero");
-
+    function withdraw() external nonReentrant noContractAllowed expectInitialized returns (uint256, uint256) {
+        // require(_amount > 0, "amount is zero");
+		// TODO: check if 30 days is reached
         CDP.Data storage _cdp = _cdps[msg.sender];
-        require(block.number > _cdp.lastDeposit, "");
+        require(block.timestamp > _cdp.depositTime, "");
 
         _cdp.update(_ctx);
+		uint _deposit = _cdp.totalDeposited;
+		uint _interest = _cdp.totalCredit;
+		_cdp.totalDeposited = 0;
+		_cdp.totalCredit = 0;
+		if(!_cdp.canHarvest(_ctx)) _interest = 0;
+		token.transfer(msg.sender, _deposit);
+		token.transferFrom(pool, msg.sender, _interest);
 
-        (uint256 _withdrawnAmount, uint256 _decreasedValue) = _withdrawFundsTo(msg.sender, _amount);
-        _cdp.totalDeposited = _cdp.totalDeposited.sub(_decreasedValue.mul(USDT_CONST), "Exceeds withdrawable amount");
-        _cdp.checkHealth(_ctx, "Action blocked: unhealthy collateralization ratio");
+        // (uint256 _withdrawnAmount, uint256 _decreasedValue) = _withdrawFundsTo(msg.sender, _amount);
+        // _cdp.totalDeposited = _cdp.totalDeposited.sub(_decreasedValue.mul(USDT_CONST), "Exceeds withdrawable amount");
+        // _cdp.checkHealth(_ctx, "Action blocked: unhealthy collateralization ratio");
 
-        emit TokensWithdrawn(msg.sender, _amount, _withdrawnAmount, _decreasedValue);
+        emit TokensWithdrawn(msg.sender, block.timestamp, _deposit, _interest);
 
-        return (_withdrawnAmount, _decreasedValue);
+        return (_deposit, _interest);
     }
 
+	// TODO: need no repay
     /// @dev Repays debt with the native and or synthetic token.
     ///
     /// An approval is required to transfer native tokens to the transmuter.
@@ -474,6 +509,7 @@ contract FormationV2 is ReentrancyGuard {
         emit TokensRepaid(msg.sender, _parentAmount, _childAmount);
     }
 
+	// TODO: need no liquidate
     /// @dev Attempts to liquidate part of a CDP's collateral to pay back its debt.
     ///
     /// @param _amount the amount of collateral to attempt to liquidate.
@@ -501,6 +537,7 @@ contract FormationV2 is ReentrancyGuard {
         return (_withdrawnAmount, _decreasedValue);
     }
 
+	// TODO: need no mint. mint triggered in harvest instead of mint itself
     /// @dev Mints synthetic tokens by either claiming credit or increasing the debt.
     ///
     /// Claiming credit will take priority over increasing the debt.
@@ -528,6 +565,7 @@ contract FormationV2 is ReentrancyGuard {
         xtoken.mint(msg.sender, _amount);
     }
 
+	// TODO: need no vault
     /// @dev Gets the number of vaults in the vault list.
     ///
     /// @return the vault count.
@@ -535,6 +573,7 @@ contract FormationV2 is ReentrancyGuard {
         return _vaults.length();
     }
 
+	// TODO: need no vault
     /// @dev Get the adapter of a vault.
     ///
     /// @param _vaultId the identifier of the vault.
@@ -545,6 +584,7 @@ contract FormationV2 is ReentrancyGuard {
         return _vault.adapter;
     }
 
+	// TODO: need no vault
     /// @dev Get the total amount of the parent asset that has been deposited into a vault.
     ///
     /// @param _vaultId the identifier of the vault.
@@ -565,6 +605,7 @@ contract FormationV2 is ReentrancyGuard {
         return _cdp.totalDeposited.div(USDT_CONST);
     }
 
+	// TODO: no debt supported in this system
     /// @dev Get the total amount of formation tokens borrowed from a CDP.
     ///
     /// @param _account the user account of the CDP to query.
@@ -575,6 +616,7 @@ contract FormationV2 is ReentrancyGuard {
         return _cdp.getUpdatedTotalDebt(_ctx);
     }
 
+	// TODO: review
     /// @dev Get the total amount of credit that a CDP has.
     ///
     /// @param _account the user account of the CDP to query.
@@ -585,6 +627,7 @@ contract FormationV2 is ReentrancyGuard {
         return _cdp.getUpdatedTotalCredit(_ctx);
     }
 
+	// TODO: review
     /// @dev Gets the last recorded block of when a user made a deposit into their CDP.
     ///
     /// @param _account the user account of the CDP to query.
@@ -595,6 +638,7 @@ contract FormationV2 is ReentrancyGuard {
         return _cdp.lastDeposit;
     }
 
+	// TODO: need no transmuter
     /// @dev sends tokens to the transmuter
     ///
     /// benefit of great nation of transmuter
