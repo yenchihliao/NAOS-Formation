@@ -43,7 +43,11 @@ contract StakingPools is ReentrancyGuard {
     event TokensClaimed(address indexed user, uint256 indexed poolId, uint256 amount);
 
     /// @dev The token which will be minted as a reward for staking.
+	// TODO: remove
     IMintableERC20 public reward;
+	
+	/// @dev The address of the official account distributing tokens as reward of stakings
+	address public rewardAddress;
 
     /// @dev The address of the account which currently has administrative capabilities over this contract.
     address public governance;
@@ -162,6 +166,7 @@ contract StakingPools is ReentrancyGuard {
     ///
     /// @param _poolId        the pool to deposit tokens into.
     /// @param _depositAmount the amount of tokens to deposit.
+	// do nothing against pool; update deposit and unclaimed(interest) in stake
     function deposit(uint256 _poolId, uint256 _depositAmount) external nonReentrant {
         Pool.Data storage _pool = _pools.get(_poolId);
         _pool.update(_ctx);
@@ -176,15 +181,16 @@ contract StakingPools is ReentrancyGuard {
     ///
     /// @param _poolId          The pool to withdraw staked tokens from.
     /// @param _withdrawAmount  The number of tokens to withdraw.
+	// TODO: remove. use claim and exit instead of withdraw
     function withdraw(uint256 _poolId, uint256 _withdrawAmount) external nonReentrant {
-        Pool.Data storage _pool = _pools.get(_poolId);
-        _pool.update(_ctx);
+        // Pool.Data storage _pool = _pools.get(_poolId);
+        // _pool.update(_ctx);
 
-        Stake.Data storage _stake = _stakes[msg.sender][_poolId];
-        _stake.update(_pool, _ctx);
+        // Stake.Data storage _stake = _stakes[msg.sender][_poolId];
+        // _stake.update(_pool, _ctx);
 
-        _claim(_poolId);
-        _withdraw(_poolId, _withdrawAmount);
+        // _claim(_poolId);
+        // _withdraw(_poolId, _withdrawAmount);
     }
 
     /// @dev Claims all rewarded tokens from a pool.
@@ -192,14 +198,14 @@ contract StakingPools is ReentrancyGuard {
     /// @param _poolId The pool to claim rewards from.
     ///
     /// @notice use this function to claim the tokens from a corresponding pool by ID.
-    function claim(uint256 _poolId) external nonReentrant {
+    function claim(uint256 _poolId, uint256 _claimAmount) external nonReentrant {
         Pool.Data storage _pool = _pools.get(_poolId);
         _pool.update(_ctx);
 
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
         _stake.update(_pool, _ctx);
 
-        _claim(_poolId);
+        _claim(_poolId, _claimAmount);
     }
 
     /// @dev Claims all rewards from a pool and then withdraws all staked tokens.
@@ -212,8 +218,9 @@ contract StakingPools is ReentrancyGuard {
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
         _stake.update(_pool, _ctx);
 
-        _claim(_poolId);
-        _withdraw(_poolId, _stake.totalDeposited);
+        // _claim(_poolId);
+		_claim(_poolId, _stake.totalUnclaimed);
+        _withdraw(_poolId);
     }
 
     /// @dev Gets the rate at which tokens are minted to stakers for all pools.
@@ -334,13 +341,13 @@ contract StakingPools is ReentrancyGuard {
     /// The pool and stake MUST be updated before calling this function.
     ///
     /// @param _poolId          The pool to withdraw staked tokens from.
-    /// @param _withdrawAmount  The number of tokens to withdraw.
-    function _withdraw(uint256 _poolId, uint256 _withdrawAmount) internal {
+    function _withdraw(uint256 _poolId) internal {
         Pool.Data storage _pool = _pools.get(_poolId);
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
 
+		uint256 _withdrawAmount = _stake.totalDeposited;
         _pool.totalDeposited = _pool.totalDeposited.sub(_withdrawAmount);
-        _stake.totalDeposited = _stake.totalDeposited.sub(_withdrawAmount);
+        _stake.totalDeposited = 0;
 
         _pool.token.safeTransfer(msg.sender, _withdrawAmount);
 
@@ -354,13 +361,19 @@ contract StakingPools is ReentrancyGuard {
     /// @param _poolId The pool to claim rewards from.
     ///
     /// @notice use this function to claim the tokens from a corresponding pool by ID.
-    function _claim(uint256 _poolId) internal {
+    function _claim(uint256 _poolId, uint256 _claimAmount) internal {
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
+        Pool.Data storage _pool = _pools.get(_poolId);
 
-        uint256 _claimAmount = _stake.totalUnclaimed;
-        _stake.totalUnclaimed = 0;
+		if(_claimAmount >= _stake.totalUnclaimed){
+			_claimAmount = _stake.totalUnclaimed;
+			_stake.totalUnclaimed = 0;
+		}else{
+			_stake.totalUnclaimed.sub(_claimAmount);
+		}
 
-        reward.mint(msg.sender, _claimAmount);
+		_pool.token.safeTransferFrom(rewardAddress, msg.sender, _claimAmount);
+        // reward.mint(msg.sender, _claimAmount);
 
         emit TokensClaimed(msg.sender, _poolId, _claimAmount);
     }

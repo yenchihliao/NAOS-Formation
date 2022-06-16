@@ -18,9 +18,19 @@ library Pool {
     using Pool for Pool.List;
     using SafeMath for uint256;
 
+	struct Level {
+          uint256 interest;
+          uint256 lowerBound; // included
+          uint256 upperBound; // excluded
+          uint256 updateDay;
+      }
+
     struct Context {
-        uint256 rewardRate;
-        uint256 totalRewardWeight;
+        uint256 rewardRate; // TODO: remove
+		uint256 period;
+        uint256 totalRewardWeight; // TODO: remove
+		uint256 periodThredshold; // time for users enabled to withdraw their interest
+		Level[] levels;
     }
 
     struct Data {
@@ -28,19 +38,20 @@ library Pool {
         uint256 totalDeposited;
         uint256 rewardWeight;
         FixedPointMath.uq192x64 accumulatedRewardWeight;
-        uint256 lastUpdatedBlock;
+        uint256 lastUpdatedBlock; // TODO: remove
     }
 
     struct List {
         Data[] elements;
     }
 
+
     /// @dev Updates the pool.
     ///
     /// @param _ctx the pool context.
-    function update(Data storage _data, Context storage _ctx) internal {
-        _data.accumulatedRewardWeight = _data.getUpdatedAccumulatedRewardWeight(_ctx);
-        _data.lastUpdatedBlock = block.number;
+    function update(Data storage _self, Context storage _ctx) internal {
+        // _data.accumulatedRewardWeight = _data.getUpdatedAccumulatedRewardWeight(_ctx);
+        // _data.lastUpdatedBlock = block.number;
     }
 
     /// @dev Gets the rate at which the pool will distribute rewards to stakers.
