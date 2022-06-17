@@ -27,9 +27,10 @@ library Pool {
 
     struct Context {
         uint256 rewardRate; // TODO: remove
-		uint256 period;
         uint256 totalRewardWeight; // TODO: remove
+		uint256 period;
 		uint256 periodThredshold; // time for users enabled to withdraw their interest
+		address rewardAddress;
 		Level[] levels;
     }
 

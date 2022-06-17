@@ -27,8 +27,21 @@ library Stake {
 		uint256 depositDay;
     }
 
+	/// @dev returns number of periods passed since epoch time
+	///
+	/// @param period number of blocktime that count as a period
+	/// @param time the target time since epoch
 	function toDays(uint period, uint time) internal view returns(uint256){
 		return time / period;
+	}
+
+	/// @dev true if the staking is long enough to claim its rewards
+	///
+	/// @param _ctx the pool context
+	function canClaim(Data storage _self, Pool.Context storage _ctx) public view returns(bool) {
+		uint256 today = toDays(_ctx.period, block.timestamp);
+		if(today.sub(_self.depositDay) >= _ctx.periodThredshold) return true;
+		return false;
 	}
 
 	/// @dev Calculates the interest yeilds so far
