@@ -45,9 +45,6 @@ contract StakingPools is ReentrancyGuard {
     /// @dev The token which will be minted as a reward for staking.
 	// TODO: remove
     IMintableERC20 public reward;
-	
-	/// @dev The address of the official account distributing tokens as reward of stakings
-	address public rewardAddress;
 
     /// @dev The address of the account which currently has administrative capabilities over this contract.
     address public governance;
@@ -80,6 +77,40 @@ contract StakingPools is ReentrancyGuard {
         require(msg.sender == governance, "StakingPools: only governance");
         _;
     }
+
+	/// @dev Set the period for calculating interest.
+	///
+    /// This function can only called by the current governance.
+	///
+	/// @param _period the period for calculating interest.
+	function setPeriod(uint256 _period) external onlyGovernance {
+		require(_period > 0,  "StakingPools: period cannot be 0");
+		_ctx.period = _period;
+
+		// TODO
+		// emit PeriodUpdated(_period);
+	}
+
+	function setPeriodThreshold(uint256 _periodThreshold) external onlyGovernance {
+		require(_periodThreshold > 0,  "StakingPools: period threshold cannot be 0");
+		_ctx.periodThredshold = _periodThreshold;
+
+		// TODO
+		// emit PeriodThresholdUpdated(_periodThreshold);
+	}
+	/// @dev Set the address of the official account distributing tokens as reward of stakings.
+	/// 
+    /// This function can only called by the current governance.
+	/// 
+	/// @param _rewardAddress the new token distributing address.
+	function setRewardAddress(address _rewardAddress) external onlyGovernance {
+        require(_rewardAddress != address(0), "StakingPools: reward token pool cannot be 0x0");
+		_ctx.rewardAddress = _rewardAddress;
+
+		// TODO
+		// emit RewardAddressUpdated(_rewardAddress);
+	}
+
 
     /// @dev Sets the governance.
     ///
@@ -204,6 +235,7 @@ contract StakingPools is ReentrancyGuard {
 
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
         _stake.update(_pool, _ctx);
+		require(_stake.canClaim(_ctx),  "StakingPools: staking too short to be claimed");
 
         _claim(_poolId, _claimAmount);
     }
@@ -218,8 +250,10 @@ contract StakingPools is ReentrancyGuard {
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
         _stake.update(_pool, _ctx);
 
-        // _claim(_poolId);
-		_claim(_poolId, _stake.totalUnclaimed);
+		// _claim(_poolId);
+		if(_stake.canClaim(_ctx)){
+			_claim(_poolId, _stake.totalUnclaimed);
+		}
         _withdraw(_poolId);
     }
 
@@ -372,7 +406,7 @@ contract StakingPools is ReentrancyGuard {
 			_stake.totalUnclaimed.sub(_claimAmount);
 		}
 
-		_pool.token.safeTransferFrom(rewardAddress, msg.sender, _claimAmount);
+		_pool.token.safeTransferFrom(_ctx.rewardAddress, msg.sender, _claimAmount);
         // reward.mint(msg.sender, _claimAmount);
 
         emit TokensClaimed(msg.sender, _poolId, _claimAmount);

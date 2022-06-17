@@ -38,7 +38,7 @@ library Stake {
 	/// @dev true if the staking is long enough to claim its rewards
 	///
 	/// @param _ctx the pool context
-	function canClaim(Data storage _self, Pool.Context storage _ctx) public view returns(bool) {
+	function canClaim(Data storage _self, Pool.Context storage _ctx) internal view returns(bool) {
 		uint256 today = toDays(_ctx.period, block.timestamp);
 		if(today.sub(_self.depositDay) >= _ctx.periodThredshold) return true;
 		return false;
