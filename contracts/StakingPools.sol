@@ -110,7 +110,11 @@ contract StakingPools is ReentrancyGuard {
 		// TODO
 		// emit RewardAddressUpdated(_rewardAddress);
 	}
-
+	function addLevel(uint256 _interest, uint256 _lowerBound, uint256 _upperBound) external onlyGovernance {
+		_ctx.levels.push(
+			Pool.Level({interest: _interest, lowerBound: _lowerBound, upperBound: _upperBound, updateDay: Stake.toDays(_ctx.period, block.timestamp)})
+		);
+	}
 
     /// @dev Sets the governance.
     ///
