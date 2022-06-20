@@ -40,7 +40,7 @@ library Stake {
 	/// @param _ctx the pool context
 	function canClaim(Data storage _self, Pool.Context storage _ctx) internal view returns(bool) {
 		uint256 today = toDays(_ctx.period, block.timestamp);
-		if(today.sub(_self.depositDay) >= _ctx.periodThredshold) return true;
+		if(today.sub(_self.depositDay) >= _ctx.periodThreshold) return true;
 		return false;
 	}
 
@@ -82,10 +82,11 @@ library Stake {
     ) internal {
 		if(_self.totalDeposited == 0){
 			_self.depositDay = toDays(_ctx.period, block.timestamp);
+		}else{
+			uint256 _interest = _self._updateInterest(_ctx);
+			_self.totalUnclaimed = _self.totalUnclaimed.add(_interest);
 		}
-		uint256 _interest = _self._updateInterest(_ctx);
 		_self.lastUpdateDay = toDays(_ctx.period, block.timestamp);
-		_self.totalUnclaimed = _self.totalUnclaimed.add(_interest);
         // _self.totalUnclaimed = _self.getUpdatedTotalUnclaimed(_pool, _ctx);
         // _self.lastAccumulatedWeight = _pool.getUpdatedAccumulatedRewardWeight(_ctx);
     }

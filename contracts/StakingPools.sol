@@ -91,19 +91,23 @@ contract StakingPools is ReentrancyGuard {
 		// emit PeriodUpdated(_period);
 	}
 
+	/// @dev Set the threshold of periods to wait before claiming interest is allowed
+	///
+	/// @param _periodThreshold The threshold of periods to wait before claiming interest is allowed
 	function setPeriodThreshold(uint256 _periodThreshold) external onlyGovernance {
 		require(_periodThreshold > 0,  "StakingPools: period threshold cannot be 0");
-		_ctx.periodThredshold = _periodThreshold;
+		_ctx.periodThreshold = _periodThreshold;
 
 		// TODO
 		// emit PeriodThresholdUpdated(_periodThreshold);
 	}
+
 	/// @dev Set the address of the official account distributing tokens as reward of stakings.
-	/// 
+	///
     /// This function can only called by the current governance.
-	/// 
+	///
 	/// @param _rewardAddress the new token distributing address.
-	function setRewardAddress(address _rewardAddress) external onlyGovernance {
+	function setRewardingAddress(address _rewardAddress) external onlyGovernance {
         require(_rewardAddress != address(0), "StakingPools: reward token pool cannot be 0x0");
 		_ctx.rewardAddress = _rewardAddress;
 
@@ -282,6 +286,48 @@ contract StakingPools is ReentrancyGuard {
         return _pools.length();
     }
 
+	/// @dev Gets the period to calculate interest
+	///
+	/// @return The period
+	function getPeriod() external view returns(uint256) {
+		return _ctx.period;
+	}
+
+	/// @dev Gets the threshold of periods to wait before claiming interest is allowed
+	///
+	/// @return The period
+	function getPeriodThreshold() external view returns(uint256) {
+		return _ctx.periodThreshold;
+	}
+
+	/// @dev Gets the address of the official account distributing tokens as reward of stakings.
+	///
+	/// @return The address distributing tokens
+	function getRewardingAddress() external view returns(address) {
+		return _ctx.rewardAddress;
+	}
+
+	/// @dev Gets the count of deposit levels added before.
+	///
+	/// @return The count
+	function getLevelCount() external view returns(uint256){
+		return _ctx.levels.length;
+	}
+
+	/// @dev Gets the n-th level added
+	///
+	/// @param n the index to the level added before.
+	///
+	/// @return the interest, lower bound, upper bound, and updateDay of the level
+	function getLevel(uint256 n) external view returns(uint256, uint256, uint256, uint256){
+		Pool.Level memory level = _ctx.levels[n];
+		return (level.interest, level.lowerBound, level.upperBound, level.updateDay);
+	}
+
+	function canClaim() external view returns(bool){
+		return Stake.canClaim(_ctx);
+	}
+	function getIntereset()
     /// @dev Gets the token a pool accepts.
     ///
     /// @param _poolId the identifier of the pool.

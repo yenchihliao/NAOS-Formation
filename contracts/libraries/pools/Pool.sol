@@ -29,7 +29,7 @@ library Pool {
         uint256 rewardRate; // TODO: remove
         uint256 totalRewardWeight; // TODO: remove
 		uint256 period;
-		uint256 periodThredshold; // time for users enabled to withdraw their interest
+		uint256 periodThreshold; // time for users enabled to withdraw their interest
 		address rewardAddress;
 		Level[] levels;
     }
