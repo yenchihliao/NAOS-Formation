@@ -10,21 +10,24 @@ async function main() {
   const pool = await ethers.getContractAt("StakingPools", config.poolAddr);
 
   console.log("# staking pool, stake balances: ");
-  console.log(await pool.getPoolTotalDeposited(0));
-  console.log(await pool.getStakeTotalDeposited(user.address, 0));
+  console.log('\t' + await pool.getPoolTotalDeposited(0));
+  console.log('\t' + await pool.getStakeTotalDeposited(user.address, 0));
   console.log("# ERC20 deployer, rewarder, user balances: ");
-  console.log(await token.balanceOf(deployer.address));
-  console.log(await token.balanceOf(rewarder.address));
-  console.log(await token.balanceOf(user.address));
-  console.log(await pool.getPoolToken(0));
+  console.log('\t' + await token.balanceOf(deployer.address));
+  console.log('\t' + await token.balanceOf(rewarder.address));
+  console.log('\t' + await token.balanceOf(user.address));
+  console.log('\t' + await pool.getPoolToken(0));
   console.log("# contract period, threshold, rewardAddr, levels");
-  console.log(await pool.getPeriod());
-  console.log(await pool.getPeriodThreshold());
-  console.log(await pool.getRewardingAddress());
+  console.log('\t' + await pool.getPeriod());
+  console.log('\t' + await pool.getPeriodThreshold());
+  console.log('\t' + await pool.getRewardingAddress());
   let n = await pool.getLevelCount();
   for(let i = 0;i < n;i++){
-    console.log(await pool.getLevel(i));
+    console.log('\t' + await pool.getLevel(i));
   }
+  console.log("# staking pool interest");
+  console.log('\t' + await pool.getStakeInfo(user.address, 0));
+  console.log('\t' + await pool.canClaim(user.address, 0));
 
 }
 
