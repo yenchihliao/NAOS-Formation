@@ -30,10 +30,6 @@ contract StakingPools is ReentrancyGuard {
 
     event GovernanceUpdated(address governance);
 
-    event RewardRateUpdated(uint256 rewardRate);
-
-    event PoolRewardWeightUpdated(uint256 indexed poolId, uint256 rewardWeight);
-
     event PoolCreated(uint256 indexed poolId, IERC20 indexed token);
 
     event TokensDeposited(address indexed user, uint256 indexed poolId, uint256 amount);
@@ -82,6 +78,8 @@ contract StakingPools is ReentrancyGuard {
 	///
     /// This function can only called by the current governance.
 	///
+	/// WARNING: It's depreciated to change the period after it's set the
+	///				first time. It can result in huge interest change
 	/// @param _period the period for calculating interest.
 	function setPeriod(uint256 _period) external onlyGovernance {
 		require(_period > 0,  "StakingPools: period cannot be 0");
@@ -190,6 +188,7 @@ contract StakingPools is ReentrancyGuard {
 
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
         _stake.update(_pool, _ctx);
+
 		require(_stake.canClaim(_ctx),  "StakingPools: staking too short to be claimed");
 
         _claim(_poolId, _claimAmount);
@@ -299,10 +298,14 @@ contract StakingPools is ReentrancyGuard {
     /// @param _poolId  The pool to check for unclaimed rewards.
     ///
     /// @return the amount of unclaimed reward tokens a user has in a pool.
-    function getStakeTotalUnclaimed(address _account, uint256 _poolId) external view returns (uint256) {
-		Stake.Data storage _stake = _stakes[_account][_poolId];
-		return _stake._updateInterest(_ctx);
-	}
+    function getStakeInfo(address _account, uint256 _poolId) external view returns (uint256, uint256, uint256, uint256) {
+        Stake.Data storage _stake = _stakes[_account][_poolId];
+        return (_stake.totalDeposited,
+				_stake._updateInterest(_ctx).add(_stake.totalUnclaimed),
+				_stake.lastUpdateDay,
+				_stake.depositDay);
+    }
+
     /// Warning:
     /// Make the staking plan before add a new pool. If the amount of pool becomes too many would
     /// result the transaction failed due to high gas usage in for-loop.
@@ -365,7 +368,7 @@ contract StakingPools is ReentrancyGuard {
 			_claimAmount = _stake.totalUnclaimed;
 			_stake.totalUnclaimed = 0;
 		}else{
-			_stake.totalUnclaimed.sub(_claimAmount);
+			_stake.totalUnclaimed = _stake.totalUnclaimed.sub(_claimAmount);
 		}
 
 		_pool.token.safeTransferFrom(_ctx.rewardAddress, msg.sender, _claimAmount);

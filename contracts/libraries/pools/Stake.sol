@@ -22,7 +22,6 @@ library Stake {
     struct Data {
         uint256 totalDeposited;
         uint256 totalUnclaimed;
-        FixedPointMath.uq192x64 lastAccumulatedWeight;
 		uint256 lastUpdateDay;
 		uint256 depositDay;
     }
@@ -76,6 +75,7 @@ library Stake {
         interest += periods * _ctx.levels[previousLevelPtr].interest;
         return interest;
     }
+
     function update(
         Data storage _self,
         Pool.Data storage _pool,
