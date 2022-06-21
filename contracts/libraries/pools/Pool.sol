@@ -26,8 +26,6 @@ library Pool {
       }
 
     struct Context {
-        uint256 rewardRate; // TODO: remove
-        uint256 totalRewardWeight; // TODO: remove
 		uint256 period;
 		uint256 periodThreshold; // time for users enabled to withdraw their interest
 		address rewardAddress;
@@ -51,43 +49,6 @@ library Pool {
     ///
     /// @param _ctx the pool context.
     function update(Data storage _self, Context storage _ctx) internal {
-        // _data.accumulatedRewardWeight = _data.getUpdatedAccumulatedRewardWeight(_ctx);
-        // _data.lastUpdatedBlock = block.number;
-    }
-
-    /// @dev Gets the rate at which the pool will distribute rewards to stakers.
-    ///
-    /// @param _ctx the pool context.
-    ///
-    /// @return the reward rate of the pool in tokens per block.
-    function getRewardRate(Data storage _data, Context storage _ctx) internal view returns (uint256) {
-        return _ctx.rewardRate.mul(_data.rewardWeight).div(_ctx.totalRewardWeight);
-    }
-
-    /// @dev Gets the accumulated reward weight of a pool.
-    ///
-    /// @param _ctx the pool context.
-    ///
-    /// @return the accumulated reward weight.
-    function getUpdatedAccumulatedRewardWeight(Data storage _data, Context storage _ctx) internal view returns (FixedPointMath.uq192x64 memory) {
-        if (_data.totalDeposited == 0) {
-            return _data.accumulatedRewardWeight;
-        }
-
-        uint256 _elapsedTime = block.number.sub(_data.lastUpdatedBlock);
-        if (_elapsedTime == 0) {
-            return _data.accumulatedRewardWeight;
-        }
-
-        uint256 _rewardRate = _data.getRewardRate(_ctx);
-        uint256 _distributeAmount = _rewardRate.mul(_elapsedTime);
-
-        if (_distributeAmount == 0) {
-            return _data.accumulatedRewardWeight;
-        }
-
-        FixedPointMath.uq192x64 memory _rewardWeight = FixedPointMath.fromU256(_distributeAmount).div(_data.totalDeposited);
-        return _data.accumulatedRewardWeight.add(_rewardWeight);
     }
 
     /// @dev Adds an element to the list.

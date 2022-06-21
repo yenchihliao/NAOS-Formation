@@ -140,19 +140,6 @@ contract StakingPools is ReentrancyGuard {
         emit GovernanceUpdated(pendingGovernance);
     }
 
-    /// @dev Sets the distribution reward rate.
-    ///
-    /// This will update all of the pools.
-    ///
-    /// @param _rewardRate The number of tokens to distribute per second.
-    function setRewardRate(uint256 _rewardRate) external onlyGovernance {
-        _updatePools();
-
-        _ctx.rewardRate = _rewardRate;
-
-        emit RewardRateUpdated(_rewardRate);
-    }
-
     /// @dev Creates a new pool.
     ///
     /// The created pool will need to have its reward weight initialized before it begins generating rewards.
@@ -175,32 +162,6 @@ contract StakingPools is ReentrancyGuard {
         return _poolId;
     }
 
-    /// @dev Sets the reward weights of all of the pools.
-    ///
-    /// @param _rewardWeights The reward weights of all of the pools.
-    function setRewardWeights(uint256[] calldata _rewardWeights) external onlyGovernance {
-        require(_rewardWeights.length == _pools.length(), "StakingPools: weights length mismatch");
-
-        _updatePools();
-
-        uint256 _totalRewardWeight = _ctx.totalRewardWeight;
-        for (uint256 _poolId = 0; _poolId < _pools.length(); _poolId++) {
-            Pool.Data storage _pool = _pools.get(_poolId);
-
-            uint256 _currentRewardWeight = _pool.rewardWeight;
-            if (_currentRewardWeight == _rewardWeights[_poolId]) {
-                continue;
-            }
-
-            _totalRewardWeight = _totalRewardWeight.sub(_currentRewardWeight).add(_rewardWeights[_poolId]);
-            _pool.rewardWeight = _rewardWeights[_poolId];
-
-            emit PoolRewardWeightUpdated(_poolId, _rewardWeights[_poolId]);
-        }
-
-        _ctx.totalRewardWeight = _totalRewardWeight;
-    }
-
     /// @dev Stakes tokens into a pool.
     ///
     /// @param _poolId        the pool to deposit tokens into.
@@ -216,26 +177,12 @@ contract StakingPools is ReentrancyGuard {
         _deposit(_poolId, _depositAmount);
     }
 
-    /// @dev Withdraws staked tokens from a pool.
-    ///
-    /// @param _poolId          The pool to withdraw staked tokens from.
-    /// @param _withdrawAmount  The number of tokens to withdraw.
-	// TODO: remove. use claim and exit instead of withdraw
-    function withdraw(uint256 _poolId, uint256 _withdrawAmount) external nonReentrant {
-        // Pool.Data storage _pool = _pools.get(_poolId);
-        // _pool.update(_ctx);
-
-        // Stake.Data storage _stake = _stakes[msg.sender][_poolId];
-        // _stake.update(_pool, _ctx);
-
-        // _claim(_poolId);
-        // _withdraw(_poolId, _withdrawAmount);
-    }
-
     /// @dev Claims all rewarded tokens from a pool.
     ///
     /// @param _poolId The pool to claim rewards from.
     ///
+	/// Claim the amount if the interest is enough from the target pool, claim all otherwise.
+	///
     /// @notice use this function to claim the tokens from a corresponding pool by ID.
     function claim(uint256 _poolId, uint256 _claimAmount) external nonReentrant {
         Pool.Data storage _pool = _pools.get(_poolId);
@@ -263,20 +210,6 @@ contract StakingPools is ReentrancyGuard {
 			_claim(_poolId, _stake.totalUnclaimed);
 		}
         _withdraw(_poolId);
-    }
-
-    /// @dev Gets the rate at which tokens are minted to stakers for all pools.
-    ///
-    /// @return the reward rate.
-    function rewardRate() external view returns (uint256) {
-        return _ctx.rewardRate;
-    }
-
-    /// @dev Gets the total reward weight between all the pools.
-    ///
-    /// @return the total reward weight.
-    function totalRewardWeight() external view returns (uint256) {
-        return _ctx.totalRewardWeight;
     }
 
     /// @dev Gets the number of pools that exist.
@@ -324,10 +257,11 @@ contract StakingPools is ReentrancyGuard {
 		return (level.interest, level.lowerBound, level.upperBound, level.updateDay);
 	}
 
-	function canClaim() external view returns(bool){
-		return Stake.canClaim(_ctx);
+	function canClaim(address _account, uint256 _poolId) external view returns(bool){
+		Stake.Data storage _stake = _stakes[_account][_poolId];
+		return _stake.canClaim(_ctx);
 	}
-	function getIntereset()
+
     /// @dev Gets the token a pool accepts.
     ///
     /// @param _poolId the identifier of the pool.
@@ -348,26 +282,6 @@ contract StakingPools is ReentrancyGuard {
         return _pool.totalDeposited;
     }
 
-    /// @dev Gets the reward weight of a pool which determines how much of the total rewards it receives per block.
-    ///
-    /// @param _poolId the identifier of the pool.
-    ///
-    /// @return the pool reward weight.
-    function getPoolRewardWeight(uint256 _poolId) external view returns (uint256) {
-        Pool.Data storage _pool = _pools.get(_poolId);
-        return _pool.rewardWeight;
-    }
-
-    /// @dev Gets the amount of tokens per block being distributed to stakers for a pool.
-    ///
-    /// @param _poolId the identifier of the pool.
-    ///
-    /// @return the pool reward rate.
-    function getPoolRewardRate(uint256 _poolId) external view returns (uint256) {
-        Pool.Data storage _pool = _pools.get(_poolId);
-        return _pool.getRewardRate(_ctx);
-    }
-
     /// @dev Gets the number of tokens a user has staked into a pool.
     ///
     /// @param _account The account to query.
@@ -386,12 +300,9 @@ contract StakingPools is ReentrancyGuard {
     ///
     /// @return the amount of unclaimed reward tokens a user has in a pool.
     function getStakeTotalUnclaimed(address _account, uint256 _poolId) external view returns (uint256) {
-        Stake.Data storage _stake = _stakes[_account][_poolId];
-        return _stake.getUpdatedTotalUnclaimed(_pools.get(_poolId), _ctx);
-    }
-
-    /// @dev Updates all of the pools.
-    ///
+		Stake.Data storage _stake = _stakes[_account][_poolId];
+		return _stake._updateInterest(_ctx);
+	}
     /// Warning:
     /// Make the staking plan before add a new pool. If the amount of pool becomes too many would
     /// result the transaction failed due to high gas usage in for-loop.
@@ -432,6 +343,7 @@ contract StakingPools is ReentrancyGuard {
 		uint256 _withdrawAmount = _stake.totalDeposited;
         _pool.totalDeposited = _pool.totalDeposited.sub(_withdrawAmount);
         _stake.totalDeposited = 0;
+		_stake.totalUnclaimed = 0;
 
         _pool.token.safeTransfer(msg.sender, _withdrawAmount);
 

@@ -39,6 +39,7 @@ library Stake {
 	///
 	/// @param _ctx the pool context
 	function canClaim(Data storage _self, Pool.Context storage _ctx) internal view returns(bool) {
+		require(_self.totalDeposited > 0, "no deposit, no claim");
 		uint256 today = toDays(_ctx.period, block.timestamp);
 		if(today.sub(_self.depositDay) >= _ctx.periodThreshold) return true;
 		return false;
@@ -64,7 +65,7 @@ library Stake {
                 previousLevelPtr = i;
                 continue;
             }else{
-                periods = toDays(_ctx.period, _ctx.levels[i].updateDay) - toDays(_ctx.period, updateDay);
+                periods = _ctx.levels[i].updateDay - updateDay;
                 updateDay = _ctx.levels[i].updateDay;
                 interest += periods * _ctx.levels[previousLevelPtr].interest;
                 previousLevelPtr = i;
@@ -87,24 +88,6 @@ library Stake {
 			_self.totalUnclaimed = _self.totalUnclaimed.add(_interest);
 		}
 		_self.lastUpdateDay = toDays(_ctx.period, block.timestamp);
-        // _self.totalUnclaimed = _self.getUpdatedTotalUnclaimed(_pool, _ctx);
-        // _self.lastAccumulatedWeight = _pool.getUpdatedAccumulatedRewardWeight(_ctx);
     }
 
-	function getUpdatedTotalUnclaimed(
-		Data storage _self,
-		Pool.Data storage _pool,
-		Pool.Context storage _ctx
-	) internal view returns (uint256) {
-		FixedPointMath.uq192x64 memory _currentAccumulatedWeight = _pool.getUpdatedAccumulatedRewardWeight(_ctx);
-		FixedPointMath.uq192x64 memory _lastAccumulatedWeight = _self.lastAccumulatedWeight;
-
-		if (_currentAccumulatedWeight.cmp(_lastAccumulatedWeight) == 0) {
-			return _self.totalUnclaimed;
-		}
-
-		uint256 _distributedAmount = _currentAccumulatedWeight.sub(_lastAccumulatedWeight).mul(_self.totalDeposited).decode();
-
-		return _self.totalUnclaimed.add(_distributedAmount);
-	}
 }
