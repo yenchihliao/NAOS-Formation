@@ -35,7 +35,13 @@ export default {
       chainId: 1337,
       allowUnlimitedContractSize: false,
       blockGasLimit: 25000000
-    }
+    },
+	taisys: {
+		url: "https://node.taisys.dev/taisys/rpc",
+		accounts: [], // 1e9, 7ac, b7b
+		chainId: 1068,
+		gasPrice: 0
+	}
   },
   solidity: {
     version: "0.6.12",
