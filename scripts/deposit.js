@@ -13,14 +13,9 @@ async function main() {
   console.log(await token.balanceOf(rewarder.address));
   console.log(await token.balanceOf(user.address));
 
-  const tx = await pool.connect(user).deposit(0, 100);
+  const tx = await pool.connect(user).deposit(0, 49);
   const rc = await tx.wait();
-  console.log(rc);
-  // await expect(pool.connect(user).deposit(0, 1))
-  //   .to.emit(pool, 'TokensDeposited')
-  //   .withArgs(user.address, 0, 1); 
-  // console.log(rc);
-  // console.log(await pool.getStakeTotalDeposited(user.address, 0));
+  console.log(rc['status']);
 
   console.log("after");
   console.log(await token.balanceOf(deployer.address));

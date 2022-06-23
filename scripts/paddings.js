@@ -1,15 +1,19 @@
-const config = require('config');
+const config = require('config')
 
 async function main() {
   const [deployer, rewarder, user] = await ethers.getSigners();
 
   // const token = await Token.attach();
   const token = await ethers.getContractAt("ERC20Mock", config.tokenAddr);
-  const pool = await ethers.getContractAt("StakingPools", config.poolAddr);
+  let tx;
+  let rc;
 
-  // pool.connect(user).deposit(0, 100);
-  let tx = await pool.connect(user).claim(0, 500);
-  let rc = await tx.wait();
+  tx = await token.connect(user).transfer(rewarder.address, 1);
+  rc = await tx.wait();
+  console.log(rc['status']);
+
+  tx = await token.connect(rewarder).transfer(user.address, 1);
+  rc = await tx.wait();
   console.log(rc['status']);
 }
 
