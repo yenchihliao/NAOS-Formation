@@ -158,6 +158,14 @@ contract StakingPools is ReentrancyGuard {
         return _poolId;
     }
 
+	function _inLevel(uint256 _amount, Pool.Level[] storage _levels) internal view returns(bool){
+		for(uint256 i = 0;i < _levels.length;i++){
+			if(_ctx.levels[i].lowerBound <= _amount && _amount < _ctx.levels[i].upperBound){
+				return true;
+			}
+		}
+		return false;
+	}
     /// @dev Stakes tokens into a pool.
     ///
     /// @param _poolId        the pool to deposit tokens into.
@@ -168,6 +176,7 @@ contract StakingPools is ReentrancyGuard {
         _pool.update(_ctx);
 
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
+		require(_inLevel(_stake.totalDeposited.add(_depositAmount), _ctx.levels), "not in any level");
         _stake.update(_pool, _ctx);
 
         _deposit(_poolId, _depositAmount);

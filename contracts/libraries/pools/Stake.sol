@@ -36,7 +36,7 @@ library Stake {
 	///
 	/// @param _ctx the pool context
 	function canClaim(Data storage _self, Pool.Context storage _ctx) internal view returns(bool) {
-		require(_self.totalDeposited > 0, "no deposit, no claim");
+		if(_self.totalDeposited == 0) return false;
 		uint256 today = toDays(_ctx.period, block.timestamp);
 		if(today.sub(_self.depositDay) >= _ctx.periodThreshold) return true;
 		return false;
@@ -68,7 +68,9 @@ library Stake {
                 previousLevelPtr = i;
             }
         }
-        require(inRange, "not in any levels");
+		if(!inRange){
+			return 0;
+		}
         periods = toDays(_ctx.period, block.timestamp).sub(updateDay);
 		interest = interest.add(periods.mul(_ctx.levels[previousLevelPtr].interest));
         return interest;
