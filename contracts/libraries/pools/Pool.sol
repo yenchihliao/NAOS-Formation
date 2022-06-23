@@ -6,14 +6,12 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 
-import {FixedPointMath} from "../FixedPointMath.sol";
 import {IDetailedERC20} from "../../interfaces/IDetailedERC20.sol";
 
 /// @title Pool
 ///
 /// @dev A library which provides the Pool data struct and associated functions.
 library Pool {
-    using FixedPointMath for FixedPointMath.uq192x64;
     using Pool for Pool.Data;
     using Pool for Pool.List;
     using SafeMath for uint256;
@@ -35,9 +33,6 @@ library Pool {
     struct Data {
         IERC20 token;
         uint256 totalDeposited;
-        uint256 rewardWeight;
-        FixedPointMath.uq192x64 accumulatedRewardWeight;
-        uint256 lastUpdatedBlock; // TODO: remove
     }
 
     struct List {

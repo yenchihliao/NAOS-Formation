@@ -5,7 +5,6 @@ import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 
-import {FixedPointMath} from "../FixedPointMath.sol";
 import {IDetailedERC20} from "../../interfaces/IDetailedERC20.sol";
 import {Pool} from "./Pool.sol";
 
@@ -13,7 +12,6 @@ import {Pool} from "./Pool.sol";
 ///
 /// @dev A library which provides the Stake data struct and associated functions.
 library Stake {
-    using FixedPointMath for FixedPointMath.uq192x64;
     using Pool for Pool.Data;
     using SafeMath for uint256;
     using Stake for Stake.Data;
@@ -31,7 +29,7 @@ library Stake {
 	/// @param period number of blocktime that count as a period
 	/// @param time the target time since epoch
 	function toDays(uint period, uint time) internal view returns(uint256){
-		return time / period;
+		return time.div(period);
 	}
 
 	/// @dev true if the staking is long enough to claim its rewards
@@ -64,15 +62,15 @@ library Stake {
                 previousLevelPtr = i;
                 continue;
             }else{
-                periods = _ctx.levels[i].updateDay - updateDay;
+                periods = _ctx.levels[i].updateDay.sub(updateDay);
                 updateDay = _ctx.levels[i].updateDay;
-                interest += periods * _ctx.levels[previousLevelPtr].interest;
+				interest = interest.add(periods.mul(_ctx.levels[previousLevelPtr].interest));
                 previousLevelPtr = i;
             }
         }
         require(inRange, "not in any levels");
-        periods = toDays(_ctx.period, block.timestamp) - updateDay;
-        interest += periods * _ctx.levels[previousLevelPtr].interest;
+        periods = toDays(_ctx.period, block.timestamp).sub(updateDay);
+		interest = interest.add(periods.mul(_ctx.levels[previousLevelPtr].interest));
         return interest;
     }
 
