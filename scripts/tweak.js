@@ -6,7 +6,7 @@ async function main() {
 
   // const token = await Token.attach();
   const token = await ethers.getContractAt("ERC20Mock", config.tokenAddr);
-  const pool = await ethers.getContractAt("StakingPools", config.poolAddr);
+  const pools = await ethers.getContractAt("StakingPools", config.poolAddr);
 
   // set period threshold
   // tx = await pools.connect(deployer).setPeriodThreshold(2);

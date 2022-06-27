@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.0;
 
-import {Math} from "@openzeppelin/contracts/math/Math.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 
 import {IDetailedERC20} from "../../interfaces/IDetailedERC20.sol";
 
@@ -14,7 +12,6 @@ import {IDetailedERC20} from "../../interfaces/IDetailedERC20.sol";
 library Pool {
     using Pool for Pool.Data;
     using Pool for Pool.List;
-    using SafeMath for uint256;
 
 	struct Level {
           uint256 interest;
@@ -78,7 +75,8 @@ library Pool {
     /// @return the index of the last element.
     function lastIndex(List storage _self) internal view returns (uint256) {
         uint256 _length = _self.length();
-        return _length.sub(1, "Pool.List: list is empty");
+		require(_length > 0, "Pool.List: list is empty");
+        return _length - 1;
     }
 
     /// @dev Gets the number of elements in the list.

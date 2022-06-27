@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IMintableERC20} from "./interfaces/IMintableERC20.sol";
 import {Pool} from "./libraries/pools/Pool.sol";
@@ -21,7 +20,6 @@ contract StakingPools is ReentrancyGuard {
     using Pool for Pool.Data;
     using Pool for Pool.List;
     using SafeERC20 for IERC20;
-    using SafeMath for uint256;
     using Stake for Stake.Data;
 
     event PendingGovernanceUpdated(address pendingGovernance);
@@ -176,7 +174,7 @@ contract StakingPools is ReentrancyGuard {
         _pool.update(_ctx);
 
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
-		require(_inLevel(_stake.totalDeposited.add(_depositAmount), _ctx.levels), "not in any level");
+		require(_inLevel(_stake.totalDeposited + _depositAmount, _ctx.levels), "not in any level");
         _stake.update(_pool, _ctx);
 
         _deposit(_poolId, _depositAmount);
@@ -308,7 +306,7 @@ contract StakingPools is ReentrancyGuard {
     function getStakeInfo(address _account, uint256 _poolId) external view returns (uint256, uint256, uint256, uint256) {
         Stake.Data storage _stake = _stakes[_account][_poolId];
         return (_stake.totalDeposited,
-				_stake._updateInterest(_ctx).add(_stake.totalUnclaimed),
+				_stake._updateInterest(_ctx) + _stake.totalUnclaimed,
 				_stake.lastUpdateDay,
 				_stake.depositDay);
     }
@@ -333,8 +331,8 @@ contract StakingPools is ReentrancyGuard {
         Pool.Data storage _pool = _pools.get(_poolId);
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
 
-        _pool.totalDeposited = _pool.totalDeposited.add(_depositAmount);
-        _stake.totalDeposited = _stake.totalDeposited.add(_depositAmount);
+        _pool.totalDeposited = _pool.totalDeposited + _depositAmount;
+        _stake.totalDeposited = _stake.totalDeposited + _depositAmount;
 
         _pool.token.safeTransferFrom(msg.sender, address(this), _depositAmount);
 
@@ -351,7 +349,7 @@ contract StakingPools is ReentrancyGuard {
         Stake.Data storage _stake = _stakes[msg.sender][_poolId];
 
 		uint256 _withdrawAmount = _stake.totalDeposited;
-        _pool.totalDeposited = _pool.totalDeposited.sub(_withdrawAmount);
+        _pool.totalDeposited = _pool.totalDeposited - _withdrawAmount;
         _stake.totalDeposited = 0;
 		_stake.totalUnclaimed = 0;
 
@@ -375,7 +373,7 @@ contract StakingPools is ReentrancyGuard {
 			_claimAmount = _stake.totalUnclaimed;
 			_stake.totalUnclaimed = 0;
 		}else{
-			_stake.totalUnclaimed = _stake.totalUnclaimed.sub(_claimAmount);
+			_stake.totalUnclaimed = _stake.totalUnclaimed - _claimAmount;
 		}
 
 		_pool.token.safeTransferFrom(_ctx.rewardAddress, msg.sender, _claimAmount);

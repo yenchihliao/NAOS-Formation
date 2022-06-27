@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.0;
 
-import {Math} from "@openzeppelin/contracts/math/Math.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IDetailedERC20} from "../../interfaces/IDetailedERC20.sol";
 import {Pool} from "./Pool.sol";
@@ -13,7 +11,6 @@ import {Pool} from "./Pool.sol";
 /// @dev A library which provides the Stake data struct and associated functions.
 library Stake {
     using Pool for Pool.Data;
-    using SafeMath for uint256;
     using Stake for Stake.Data;
 
 	// TODO: remove. We only need totalDeposited
@@ -29,7 +26,7 @@ library Stake {
 	/// @param period number of blocktime that count as a period
 	/// @param time the target time since epoch
 	function toDays(uint period, uint time) internal view returns(uint256){
-		return time.div(period);
+		return time / period;
 	}
 
 	/// @dev true if the staking is long enough to claim its rewards
@@ -38,7 +35,7 @@ library Stake {
 	function canClaim(Data storage _self, Pool.Context storage _ctx) internal view returns(bool) {
 		if(_self.totalDeposited == 0) return false;
 		uint256 today = toDays(_ctx.period, block.timestamp);
-		if(today.sub(_self.depositDay) >= _ctx.periodThreshold) return true;
+		if(today - _self.depositDay >= _ctx.periodThreshold) return true;
 		return false;
 	}
 
@@ -62,17 +59,17 @@ library Stake {
                 previousLevelPtr = i;
                 continue;
             }else{
-                periods = _ctx.levels[i].updateDay.sub(updateDay);
+                periods = _ctx.levels[i].updateDay - updateDay;
                 updateDay = _ctx.levels[i].updateDay;
-				interest = interest.add(periods.mul(_ctx.levels[previousLevelPtr].interest));
+				interest = interest + periods * _ctx.levels[previousLevelPtr].interest;
                 previousLevelPtr = i;
             }
         }
 		if(!inRange){
 			return 0;
 		}
-        periods = toDays(_ctx.period, block.timestamp).sub(updateDay);
-		interest = interest.add(periods.mul(_ctx.levels[previousLevelPtr].interest));
+        periods = toDays(_ctx.period, block.timestamp) - updateDay;
+		interest = interest + periods * _ctx.levels[previousLevelPtr].interest;
         return interest;
     }
 
@@ -85,7 +82,7 @@ library Stake {
 			_self.depositDay = toDays(_ctx.period, block.timestamp);
 		}else{
 			uint256 _interest = _self._updateInterest(_ctx);
-			_self.totalUnclaimed = _self.totalUnclaimed.add(_interest);
+			_self.totalUnclaimed += _interest;
 		}
 		_self.lastUpdateDay = toDays(_ctx.period, block.timestamp);
     }

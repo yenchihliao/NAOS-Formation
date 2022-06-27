@@ -9,6 +9,7 @@ async function main() {
 
     // const ERC20Mock = await ethers.getContractFactory('ERC20Mock')
     // const daiToken = await ERC20Mock.deploy('Mock DAI', 'DAI', 18)
+    // const daiToken = await ERC20Mock.deploy('Mock DAI', 'DAI')
     // console.log(`DAI Token: ${daiToken.address}`)
 
     // let token = daiToken.address;
